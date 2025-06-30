@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./db.sqlite"
+}
+
+model utilisateur {
+  id              Int       @id @default(autoincrement())
+  nom             String
+  email           String    @unique
+  adresseLivraison String
+  commandes       commande[]
+  panier          panier[]
+  avis            avis[]
+  GestionUtilisateur  gestionUtilisateur[]
+}
+
+model produit {
+  id          Int       @id @default(autoincrement())
+  nom         String
+  description String
+  prix        Float
+  stock       Int
+  marque      String
+  image       String
+  categorieId Int
+  categorie   categorie @relation(fields: [categorieId], references: [id])
+  avis        avis[]
+  lignesCommande ligneCommande[]
+  lignePanier lignePanier[]
+  GestionProduit  gestionProduit[]
+  Promotion promotion[]
+}
+
+model categorie {
+  id          Int       @id @default(autoincrement())
+  nom         String
+  produits    produit[]
+}
+
+model commande {
+  id             Int       @id @default(autoincrement())
+  dateCommande   DateTime  @default(now())
+  statut         String
+  totalCommande  Float
+  modePaiement   String
+  adresseLivraison String
+  utilisateurId  Int
+  utilisateur    utilisateur @relation(fields: [utilisateurId], references: [id])
+  lignesCommande ligneCommande[]
+  paiements      paiement[]
+  GestionCommande gestionCommande[]
+}
+
+model ligneCommande {
+  id           Int      @id @default(autoincrement())
+  commandeId   Int
+  produitId    Int
+  quantite     Int
+  prixUnitaire Float
+  commande     commande @relation(fields: [commandeId], references: [id])
+  produit      produit  @relation(fields: [produitId], references: [id])
+}
+
+model panier {
+  id           Int        @id @default(autoincrement())
+  utilisateurId Int
+  dateCreation DateTime   @default(now())
+  utilisateur  utilisateur @relation(fields: [utilisateurId], references: [id])
+  lignesPanier lignePanier[]
+}
+
+model lignePanier {
+  id          Int      @id @default(autoincrement())
+  panierId    Int
+  produitId   Int
+  quantite    Int
+  panier      panier   @relation(fields: [panierId], references: [id])
+  produit     produit  @relation(fields: [produitId], references: [id])
+}
+
+model paiement {
+  id            Int       @id @default(autoincrement())
+  commandeId    Int
+  montant       Float
+  datePaiement  DateTime  @default(now())
+  statut        String
+  methodePaiement String
+  commande      commande @relation(fields: [commandeId], references: [id])
+}
+
+model avis {
+  id          Int       @id @default(autoincrement())
+  produitId   Int
+  utilisateurId Int
+  note        Int
+  commentaire String?
+  dateAvis    DateTime  @default(now())
+  produit     produit   @relation(fields: [produitId], references: [id])
+  utilisateur utilisateur @relation(fields: [utilisateurId], references: [id])
+}
+
+model promotion {
+  id            Int       @id @default(autoincrement())
+  codePromo     String    @unique
+  description   String
+  type          String    
+  valeur        Float     
+  dateDebut     DateTime
+  dateFin       DateTime
+  produitId     Int
+  administrateurId Int
+  produit       produit   @relation(fields: [produitId], references: [id])
+  GestionPromotion gestionPromotion[]
+}
+
+model administrateur {
+  id          Int       @id @default(autoincrement())
+  nom         String
+  email       String    @unique
+  password    String
+  gestionProduits gestionProduit[]
+  gestionCommandes gestionCommande[]
+  gestionUtilisateurs gestionUtilisateur[]
+  gestionPromotions gestionPromotion[]
+}
+
+model gestionProduit {
+  id          Int       @id @default(autoincrement())
+  adminId     Int
+  produitId   Int
+  action      String
+  dateAction  DateTime  @default(now())
+  administrateur administrateur @relation(fields: [adminId], references: [id])
+  produit     produit   @relation(fields: [produitId], references: [id])
+}
+
+model gestionCommande {
+  id          Int       @id @default(autoincrement())
+  adminId     Int
+  commandeId  Int
+  action      String
+  dateAction  DateTime  @default(now())
+  administrateur administrateur @relation(fields: [adminId], references: [id])
+  commande    commande  @relation(fields: [commandeId], references: [id])
+}
+
+model gestionUtilisateur {
+  id          Int       @id @default(autoincrement())
+  adminId     Int
+  utilisateurId Int
+  action      String
+  dateAction  DateTime  @default(now())
+  administrateur administrateur @relation(fields: [adminId], references: [id])
+  utilisateur utilisateur @relation(fields: [utilisateurId], references: [id])
+}
+
+model gestionPromotion {
+  id            Int       @id @default(autoincrement())
+  administrateurId Int
+  promotionId   Int
+  action        String    // Actions de gestion (ajout, modification, suppression)
+  dateAction    DateTime  @default(now())
+  administrateur administrateur @relation(fields: [administrateurId], references: [id])
+  promotion     promotion @relation(fields: [promotionId], references: [id])
+}
+
