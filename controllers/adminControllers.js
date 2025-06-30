@@ -1,10 +1,11 @@
-import { PrismaClient } from "@prisma/client";
+import pkg from "@prisma/client";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
-
 import dotenv from "dotenv";
-dotenv.config();
+import { body, validationResult } from "express-validator";
 
+dotenv.config();
+const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 
 // Afficher la page d'accueil de l'administrateur
@@ -12,63 +13,56 @@ export const afficherAdminAccueil = (req, res) => {
   res.status(200).json({ message: "Page d'accueil admin", actions: ["Login"] });
 };
 
+// Middleware de validation pour les administrateurs
+const validateAdminInput = [
+  body("email").isEmail().withMessage("Email invalide"),
+  body("password").isLength({ min: 6 }).withMessage("Mot de passe trop court"),
+];
+
 // Créer un nouvel administrateur
-export const creerAdmin = async (req, res) => {
-  const { nom, email, password } = req.body;
-
-  try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email et mot de passe requis" });
+export const creerAdmin = [
+  ...validateAdminInput,
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    // Vérifier si l'admin existe déjà
-    const adminExiste = await prisma.administrateur.findUnique({
-      where: { email },
-    });
-    if (adminExiste) {
-      return res
-        .status(400)
-        .json({ message: "Cet administrateur existe déjà" });
+    const { nom, email, password } = req.body;
+
+    try {
+      const adminExiste = await prisma.administrateur.findUnique({
+        where: { email },
+      });
+      if (adminExiste) {
+        return res.status(400).json({ message: "Cet administrateur existe déjà" });
+      }
+
+      const hashedPassword = await bcryptjs.hash(password, 10);
+      const nouvelAdmin = await prisma.administrateur.create({
+        data: { nom, email, password: hashedPassword },
+      });
+
+      res.status(201).json({
+        message: "Administrateur créé avec succès",
+        administrateur: nouvelAdmin,
+      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
-
-    // Hasher le mot de passe
-    const hashedPassword = await bcryptjs.hash(password, 10);
-
-    // Créer l'admin
-    const nouvelAdmin = await prisma.administrateur.create({
-      data: {
-        nom,
-        email,
-        password: hashedPassword,
-      },
-    });
-
-    res.status(201).json({
-      message: "Administrateur créé avec succès",
-      administrateur: nouvelAdmin,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  },
+];
 
 // Se connecter en tant qu'administrateur
 export const loginAdmin = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email et mot de passe requis" });
-    }
-
     const administrateur = await prisma.administrateur.findUnique({
       where: { email: email.toLowerCase() },
     });
 
-    if (
-      administrateur &&
-      (await bcryptjs.compare(password, administrateur.password))
-    ) {
+    if (administrateur && await bcryptjs.compare(password, administrateur.password)) {
       const token = jwt.sign(
         { administrateurId: administrateur.id, email: administrateur.email },
         process.env.JWT_SECRET,
@@ -81,36 +75,52 @@ export const loginAdmin = async (req, res) => {
         sameSite: "Strict",
         maxAge: 3600000,
       });
-      res.status(200).json({
-        message: "Connexion réussie",
-        token,
-      });
+      res.status(200).json({ message: "Connexion réussie", token });
     } else {
       res.status(401).json({ message: "Identifiants invalides" });
     }
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Erreur serveur", error: error.toString() });
+    res.status(500).json({ message: "Erreur serveur", error: error.toString() });
   }
 };
 
-// Créer une nouvelle catégorie
-export const createCategorie = async (req, res) => {
-  const { nom } = req.body;
-
-  try {
-    const newCategorie = await prisma.categorie.create({
-      data: { nom },
-    });
-    res
-      .status(201)
-      .json({ message: "categorie creer avec succes", newCategorie });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+// Middleware pour vérifier le token
+export const authenticateJWT = (req, res, next) => {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.sendStatus(403);
   }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.sendStatus(403);
+    }
+    req.user = user;
+    next();
+  });
 };
+
+// Créer une nouvelle catégorie avec validation
+export const createCategorie = [
+  body("nom").notEmpty().withMessage("Le nom est requis."),
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { nom } = req.body;
+
+    try {
+      const newCategorie = await prisma.categorie.create({
+        data: { nom },
+      });
+      res.status(201).json({ message: "Catégorie créée avec succès", newCategorie });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+];
 
 // Récupérer toutes les catégories
 export const getAllCategorie = async (req, res) => {
@@ -121,6 +131,7 @@ export const getAllCategorie = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // Obtenir une catégorie par ID
 export const getCategorieById = async (req, res) => {
