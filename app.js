@@ -20,7 +20,9 @@ app.use(express.json()); // Middleware pour parser le JSON dans les requêtes
 app.use(express.urlencoded({ extended: true })); // Pour parser les formulaires URL-encodés
 app.use(
   cors({
-    origin: "http://localhost:3000", // le port de ton frontend Next.js
+    origin: "http://localhost:3000",
+    "https://olostore.netlify.app/": true, // Autoriser les requêtes de ce domaine
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
