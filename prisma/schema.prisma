@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./db.sqlite"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model utilisateur {
@@ -167,4 +168,3 @@ model gestionPromotion {
   administrateur administrateur @relation(fields: [administrateurId], references: [id])
   promotion     promotion @relation(fields: [promotionId], references: [id])
 }
-
